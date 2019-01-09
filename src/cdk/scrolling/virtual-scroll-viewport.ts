@@ -29,6 +29,11 @@ import {ScrollDispatcher} from './scroll-dispatcher';
 import {CdkScrollable, ExtendedScrollToOptions} from './scrollable';
 import {CdkVirtualForOf} from './virtual-for-of';
 import {VIRTUAL_SCROLL_STRATEGY, VirtualScrollStrategy} from './virtual-scroll-strategy';
+import {
+  VIRTUAL_SCROLL_CONTAINER_REF,
+  VirtualScrollContainerRef,
+  CdkVirtualScrollDefaultViewport,
+} from './virtual-scroll-container';
 
 
 /** Checks if the given ranges are equal. */
@@ -55,7 +60,7 @@ function rangesEqual(r1: ListRange, r2: ListRange): boolean {
     useExisting: CdkVirtualScrollViewport,
   }]
 })
-export class CdkVirtualScrollViewport extends CdkScrollable implements OnInit, OnDestroy {
+export class CdkVirtualScrollViewport implements OnInit, OnDestroy {
   /** Emits when the viewport is detached from a CdkVirtualForOf. */
   private _detachedSubject = new Subject<void>();
 
@@ -82,10 +87,11 @@ export class CdkVirtualScrollViewport extends CdkScrollable implements OnInit, O
   renderedRangeStream: Observable<ListRange> = this._renderedRangeSubject.asObservable();
 
   /**
-   * The transform used to scale the spacer to the same size as all content, including content that
+   * The height and width used to scale the spacer to the same size as all content, including content that
    * is not currently rendered.
    */
-  _totalContentSizeTransform = '';
+  _totalContentHeight = 0;
+  _totalContentWidth = 0;
 
   /**
    * The total size of all content (in pixels), including content that is not currently rendered.
@@ -125,14 +131,19 @@ export class CdkVirtualScrollViewport extends CdkScrollable implements OnInit, O
   /** A list of functions to run after the next change detection cycle. */
   private _runAfterChangeDetection: Function[] = [];
 
-  constructor(public elementRef: ElementRef<HTMLElement>,
+  constructor(public elementRef: ElementRef,
               private _changeDetectorRef: ChangeDetectorRef,
-              ngZone: NgZone,
+              scrollDispatcher: ScrollDispatcher,
+              private ngZone: NgZone,
               @Optional() @Inject(VIRTUAL_SCROLL_STRATEGY)
                   private _scrollStrategy: VirtualScrollStrategy,
-              @Optional() dir: Directionality,
-              scrollDispatcher: ScrollDispatcher) {
-    super(elementRef, scrollDispatcher, ngZone, dir);
+              @Optional()
+                private dir: Directionality,
+              @Optional() @Inject(VIRTUAL_SCROLL_CONTAINER_REF)
+                public _containerRef: VirtualScrollContainerRef) {
+    if (!_containerRef) {
+      this._containerRef = new CdkVirtualScrollDefaultViewport(elementRef, scrollDispatcher, ngZone, dir);
+    }
 
     if (!_scrollStrategy) {
       throw Error('Error: cdk-virtual-scroll-viewport requires the "itemSize" property to be set.');
@@ -140,8 +151,6 @@ export class CdkVirtualScrollViewport extends CdkScrollable implements OnInit, O
   }
 
   ngOnInit() {
-    super.ngOnInit();
-
     // It's still too early to measure the viewport at this point. Deferring with a promise allows
     // the Viewport to be rendered with the correct size before we measure. We run this outside the
     // zone to avoid causing more change detection cycles. We handle the change detection loop
@@ -150,7 +159,7 @@ export class CdkVirtualScrollViewport extends CdkScrollable implements OnInit, O
       this._measureViewportSize();
       this._scrollStrategy.attach(this);
 
-      this.elementScrolled()
+      this._containerRef.elementScrolled()
           .pipe(
               // Start off with a fake scroll event so we properly detect our initial position.
               startWith<Event | null>(null!),
@@ -171,8 +180,6 @@ export class CdkVirtualScrollViewport extends CdkScrollable implements OnInit, O
     // Complete all subjects
     this._renderedRangeSubject.complete();
     this._detachedSubject.complete();
-
-    super.ngOnDestroy();
   }
 
   /** Attaches a `CdkVirtualForOf` to this viewport. */
@@ -230,9 +237,20 @@ export class CdkVirtualScrollViewport extends CdkScrollable implements OnInit, O
   setTotalContentSize(size: number) {
     if (this._totalContentSize !== size) {
       this._totalContentSize = size;
-      const axis = this.orientation == 'horizontal' ? 'X' : 'Y';
-      this._totalContentSizeTransform = `scale${axis}(${this._totalContentSize})`;
-      this._markChangeDetectionNeeded();
+
+      if (this.orientation === 'horizontal') {
+        this._totalContentWidth = this._totalContentSize;
+        this._totalContentHeight = 1;
+      } else {
+        this._totalContentWidth = 1;
+        this._totalContentHeight = this._totalContentSize;
+      }
+
+      // NOTE(rmedaer) force change detection to actualize spacer size
+      // if we delay it "out of angular", the parent component cannot scroll
+      // afterViewInit on renderedRangeStream signal.
+      this._changeDetectorRef.detectChanges();
+      //this._markChangeDetectionNeeded();
     }
   }
 
@@ -301,7 +319,7 @@ export class CdkVirtualScrollViewport extends CdkScrollable implements OnInit, O
     } else {
       options.top = offset;
     }
-    this.scrollTo(options);
+    this._containerRef.scrollTo(options);
   }
 
   /**
@@ -319,8 +337,7 @@ export class CdkVirtualScrollViewport extends CdkScrollable implements OnInit, O
    *     in horizontal mode.
    */
   measureScrollOffset(from?: 'top' | 'left' | 'right' | 'bottom' | 'start' | 'end'): number {
-    return super.measureScrollOffset(
-        from ? from : this.orientation === 'horizontal' ? 'start' : 'top');
+    return this._containerRef.measureScrollOffset(from ? from : this.orientation === 'horizontal' ? 'start' : 'top')
   }
 
   /** Measure the combined size of all of the rendered items. */
@@ -349,9 +366,7 @@ export class CdkVirtualScrollViewport extends CdkScrollable implements OnInit, O
 
   /** Measure the viewport size. */
   private _measureViewportSize() {
-    const viewportEl = this.elementRef.nativeElement;
-    this._viewportSize = this.orientation === 'horizontal' ?
-        viewportEl.clientWidth : viewportEl.clientHeight;
+    this._viewportSize = this._containerRef.measureContainerSize(this.orientation);
   }
 
   /** Queue up change detection to run. */

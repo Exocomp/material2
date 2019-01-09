@@ -26,9 +26,8 @@
   }
 }
 
-
 // Scrolling container.
-cdk-virtual-scroll-viewport {
+.cdk-virtual-scroll-viewport {
   display: block;
   position: relative;
   overflow: auto;
@@ -38,29 +37,32 @@ cdk-virtual-scroll-viewport {
   -webkit-overflow-scrolling: touch;
 }
 
+.cdk-virtual-scroll-nested-viewport, .cdk-virtual-scroll-window-viewport {
+  display: block;
+  position: relative;
+  overflow: visible;
+  contain: none;
+}
+
 // Wrapper element for the rendered content. This element will be transformed to push the rendered
 // content to its correct offset in the data set as a whole.
 .cdk-virtual-scroll-content-wrapper {
-  position: absolute;
-  top: 0;
-  left: 0;
-  contain: content;
-
   // Note: We can't put `will-change: transform;` here because it causes Safari to not update the
   // viewport's `scrollHeight` when the spacer's transform changes.
-
-  [dir='rtl'] & {
-    right: 0;
-    left: auto;
-  }
 }
 
 .cdk-virtual-scroll-orientation-horizontal .cdk-virtual-scroll-content-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
   min-height: 100%;
   @include _cdk-virtual-scroll-clear-container-space(horizontal);
 }
 
 .cdk-virtual-scroll-orientation-vertical .cdk-virtual-scroll-content-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
   min-width: 100%;
   @include _cdk-virtual-scroll-clear-container-space(vertical);
 }
@@ -69,19 +71,4 @@ cdk-virtual-scroll-viewport {
 // set if it were rendered all at once. This ensures that the scrollable content region is the
 // correct size.
 .cdk-virtual-scroll-spacer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 1px;
-  width: 1px;
-  transform-origin: 0 0;
-
-  // Note: We can't put `will-change: transform;` here because it causes Safari to not update the
-  // viewport's `scrollHeight` when the spacer's transform changes.
-
-  [dir='rtl'] & {
-    right: 0;
-    left: auto;
-    transform-origin: 100% 0;
-  }
 }

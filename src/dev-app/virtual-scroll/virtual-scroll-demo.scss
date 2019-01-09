@@ -55,3 +55,16 @@
 .demo-td {
   border: 1px solid gray;
 }
+
+.demo-viewport-container {
+  height: 500px;
+  width: 500px;
+  overflow: auto;
+  position: relative;
+}
+
+.demo-viewport-header,
+.demo-viewport-footer {
+  height: 1000px;
+}
+

@@ -170,3 +170,21 @@
     </tr>
   </table>
 </cdk-virtual-scroll-viewport>
+
+<h3>Fixed sized nested within closest relative parent</h3>
+<div class="demo-viewport-container">
+  <div class="demo-viewport-header">
+    Huge header
+  </div>
+  <cdk-virtual-scroll-viewport [itemSize]="50" nested>
+    <div *cdkVirtualFor="let size of parentContainerSizeData; let i = index" class="demo-item"
+         [style.height.px]="50">
+      Item #{{i}}
+    </div>
+  </cdk-virtual-scroll-viewport>
+  <div class="demo-viewport-footer">
+    Huge footer
+  </div>
+</div>
+
+<!-- TODO(rme) demo with window -->
